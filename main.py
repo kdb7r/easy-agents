@@ -5,6 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from contextlib import asynccontextmanager
 from utils.cron import cron, cron_jobs
+import re
 
 
 # This is a FastAPI lifecycle manager that starts the cron job scheduler when the app starts
@@ -21,12 +22,18 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
+def sanitize_alert_id(alert_id: str) -> str:
+    # Allow only alphanumeric, dash, underscore characters to prevent prompt injection
+    return re.sub(r'[^a-zA-Z0-9_-]', '', alert_id)
+
+
 app = FastAPI(lifespan=lifespan)  # for webhook triggers
 scheduler = AsyncIOScheduler()  # for cron job triggers
 
 
 @app.get("/security-alert-agent/{alert_id}")
 async def security_alert_agent(alert_id: str):
+    alert_id = sanitize_alert_id(alert_id)
     system_prompt = """
     You are an expert security agent that is responsible for investigating security alerts from our SIEM.
     
@@ -55,6 +62,7 @@ async def security_alert_agent(alert_id: str):
 
 @app.get("/code-scanning-alert-agent/{repo_owner}/{repo_name}/{alert_id}")
 async def code_scanning_alert_agent(repo_owner: str, repo_name: str, alert_id: str):
+    alert_id = sanitize_alert_id(alert_id)
     system_prompt = """
     You are a security agent that is responsible for analyzing and fixing code-scanning security alerts.
     
@@ -71,7 +79,7 @@ async def code_scanning_alert_agent(repo_owner: str, repo_name: str, alert_id: s
     - Be sure to run `just` commands to ensure all tests pass before creating a PR.
     - Use git worktrees so multiple agents can work on the same repo without conflicts. Create the worktree in the tmp directory ($CWD/tmp). The branch name should include the alert ID.
     - Ensure you pull latest from main branch before making any code changes.
-    - Add "Created with Claude Code Security Agent 🤖. Any issues or questions please contact Kyle" to the PR description and any comments.
+    - Add "Created with Claude Code Security Agent 9. Any issues or questions please contact Kyle" to the PR description and any comments.
     """
     agent = Agent(
         name="code-scanning-alert-agent",
@@ -87,6 +95,7 @@ async def code_scanning_alert_agent(repo_owner: str, repo_name: str, alert_id: s
 
 @app.get("/dependabot-alert-agent/{repo_owner}/{repo_name}/{alert_id}")
 async def dependabot_alert_agent(repo_owner: str, repo_name: str, alert_id: str):
+    alert_id = sanitize_alert_id(alert_id)
     system_prompt = """
     You are a security agent that is responsible for analyzing and fixing dependabot security alerts.
     
@@ -103,7 +112,7 @@ async def dependabot_alert_agent(repo_owner: str, repo_name: str, alert_id: str)
     - Be sure to run `just` commands to ensure all tests pass before creating a PR.
     - Use git worktrees so multiple agents can work on the same repo without conflicts. Create the worktree in the tmp directory ($CWD/tmp). The branch name should include the alert ID.
     - Ensure you pull latest from main branch before making any code changes.
-    - Add "Created with Claude Code Security Agent 🤖. Any issues or questions please contact Kyle" to the PR description and any comments.
+    - Add "Created with Claude Code Security Agent 9. Any issues or questions please contact Kyle" to the PR description and any comments.
     """
 
     agent = Agent(
